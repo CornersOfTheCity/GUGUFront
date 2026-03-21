@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════
 
 import { BrowserProvider } from 'ethers';
-import { CHAIN_ID, CHAIN_NAME, CHAIN_RPC, CHAIN_EXPLORER } from '../config/contracts.js';
+import { CHAIN_ID, CHAIN_NAME, CHAIN_RPC, CHAIN_EXPLORER, CHAIN_CURRENCY } from '../config/contracts.js';
 
 let provider = null;
 let signer = null;
@@ -66,6 +66,11 @@ export async function connectWallet() {
               chainName: CHAIN_NAME,
               rpcUrls: [CHAIN_RPC],
               blockExplorerUrls: [CHAIN_EXPLORER],
+              nativeCurrency: {
+                name: CHAIN_CURRENCY || 'ETH',
+                symbol: CHAIN_CURRENCY || 'ETH',
+                decimals: 18,
+              },
             },
           ],
         });

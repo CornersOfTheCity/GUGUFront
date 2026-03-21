@@ -3,19 +3,20 @@
 // ═══════════════════════════════════════════
 // 部署后将实际地址填入此处
 
-export const CHAIN_ID = 11155111; // Sepolia
-export const CHAIN_NAME = 'Sepolia Testnet';
-export const CHAIN_RPC = 'https://rpc.sepolia.org';
-export const CHAIN_EXPLORER = 'https://sepolia.etherscan.io';
+export const CHAIN_ID = 97; // BSC Testnet
+export const CHAIN_NAME = 'BSC Testnet';
+export const CHAIN_RPC = 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
+export const CHAIN_EXPLORER = 'https://testnet.bscscan.com';
+export const CHAIN_CURRENCY = 'tBNB';
 
-// ── 合约地址 (占位) ──
+// ── 合约地址 (BSC Testnet) ──
 
-export const GUGUNFT_ADDRESS = '0x0000000000000000000000000000000000000001';
-export const GUGUToken_ADDRESS = '0x0000000000000000000000000000000000000002';
-export const NFTStaking_ADDRESS = '0x0000000000000000000000000000000000000003';
-export const MysteryBox_ADDRESS = '0x0000000000000000000000000000000000000004';
-export const TokenSwap_ADDRESS = '0x0000000000000000000000000000000000000005';
-export const Airdrop_ADDRESS = '0x0000000000000000000000000000000000000006';
+export const GUGUToken_ADDRESS  = '0x04BdeA7C305aCBdC05072DA1Ce29729d6880f89a';
+export const GUGUNFT_ADDRESS    = '0x764f16e89FE34E3DE8Fab2b0f21003a5Ee31210B';
+export const NFTStaking_ADDRESS = '0xCee4A2B098d9BfEAe91Bd942Af21Ca257683fE7C';
+export const MysteryBox_ADDRESS = '0xf07255d83bAdE34eCf1e64775c30B7D751d5D914';
+export const TokenSwap_ADDRESS  = '0x5cD6520090d623695aE44391DB9110F12Af0449E';
+export const Airdrop_ADDRESS    = '0xff0b91F7eEE1d6E0771d84369791eCB8876E4567';
 
 // ── ABI 片段 ──
 
@@ -23,7 +24,6 @@ export const GUGUNFT_ABI = [
   'function mintPublic(uint8 rarity) external payable',
   'function getRarity(uint256 tokenId) external view returns (uint8)',
   'function totalSupplyByRarity(uint8) external view returns (uint256)',
-  'function maxSupplyByRarity(uint8) external view returns (uint256)',
   'function mintPriceByRarity(uint8) external view returns (uint256)',
   'function totalSupply() external view returns (uint256)',
   'function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256)',
@@ -41,6 +41,7 @@ export const GUGUNFT_ABI = [
   'function mint(address to, uint8 rarity) external returns (uint256)',
   'function mintBatch(address to, uint8 rarity, uint256 quantity) external',
   'function setBaseURI(string calldata baseURI) external',
+  'function setMintPrice(uint8 rarity, uint256 price) external',
   'function withdraw() external',
 ];
 
@@ -76,23 +77,28 @@ export const NFTStaking_ABI = [
   // ── Admin ──
   'function owner() external view returns (address)',
   'function setDailyReward(uint8 rarity, uint256 rewardPerDay) external',
+  'function rescueToken(address to, uint256 amount) external',
 ];
 
 export const MysteryBox_ABI = [
   'function buyBox(uint256 quantity) external',
-  'function boxPrice() external view returns (uint256)',
+  'function currentBoxPrice() external view returns (uint256)',
+  'function basePrice() external view returns (uint256)',
+  'function maxPrice() external view returns (uint256)',
+  'function totalBoxOpened() external view returns (uint256)',
   'function probabilities(uint256 index) external view returns (uint256)',
   'function getRequestStatus(uint256 requestId) external view returns (bool fulfilled, uint256[] memory randomWords)',
   'function getRequestIds() external view returns (uint256[])',
   'function MAX_PER_TX() external view returns (uint256)',
-  'event BoxRequested(address indexed buyer, uint256 indexed requestId, uint256 quantity)',
+  'event BoxRequested(address indexed buyer, uint256 indexed requestId, uint256 quantity, uint256 totalCost)',
   'event BoxOpened(address indexed buyer, uint256 indexed tokenId, uint8 rarity)',
   // ── Admin ──
   'function s_subscriptionId() external view returns (uint256)',
   'function s_keyHash() external view returns (bytes32)',
   'function s_callbackGasLimit() external view returns (uint32)',
   'function s_requestConfirmations() external view returns (uint16)',
-  'function setBoxPrice(uint256 price) external',
+  'function setBasePrice(uint256 _basePrice) external',
+  'function setMaxPrice(uint256 _maxPrice) external',
   'function setProbabilities(uint256[3] calldata probs) external',
   'function setVRFConfig(bytes32 keyHash, uint32 callbackGasLimit, uint16 requestConfirmations) external',
   'function setSubscriptionId(uint256 subscriptionId) external',
@@ -141,8 +147,8 @@ export const RARITY_NAMES = ['Founder', 'Pro', 'Basic'];
 export const RARITY_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4'];
 export const RARITY_EMOJIS = ['👑', '⚡', '🌟'];
 
-export const MINT_PRICES_ETH = ['0.5', '0.1', '0.02'];
-export const MAX_SUPPLY = [100, 500, 2000];
+export const MINT_PRICES_ETH = ['0.25', '0.025', '0.0025'];
+
 export const DAILY_REWARDS = ['50', '15', '3'];
 
 // ── Tokenomics ──

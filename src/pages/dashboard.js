@@ -91,10 +91,7 @@ export async function renderDashboardPage(container) {
                 return `
                   <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <span class="rarity-badge ${rarityClass}" style="min-width: 90px;">${RARITY_EMOJIS[i]} ${RARITY_NAMES[i]}</span>
-                    <div class="progress-bar" style="flex: 1;">
-                      <div class="progress-fill ${rarityClass}" id="dash-progress-${i}" style="width: 0%;"></div>
-                    </div>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 70px; text-align: right;" id="dash-supply-${i}">— / —</span>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);" id="dash-supply-${i}">— minted</span>
                   </div>
                 `;
               }).join('')}
@@ -266,16 +263,10 @@ async function loadDashNfts(nftContract, address, balance) {
 }
 
 async function loadSupplyProgress(nftContract) {
-  const { MAX_SUPPLY } = await import('../config/contracts.js');
   for (let i = 0; i < 3; i++) {
     try {
       const minted = await nftContract.totalSupplyByRarity(i);
-      const max = MAX_SUPPLY[i];
-      const mintedNum = Number(minted);
-
-      setDashValue(`dash-supply-${i}`, `${mintedNum} / ${max}`);
-      const progressEl = document.getElementById(`dash-progress-${i}`);
-      if (progressEl) progressEl.style.width = `${(mintedNum / max) * 100}%`;
+      setDashValue(`dash-supply-${i}`, `${Number(minted)} minted`);
     } catch {}
   }
 }

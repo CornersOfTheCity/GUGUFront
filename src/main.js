@@ -4,11 +4,12 @@
 
 import './style.css';
 import { connectWallet, disconnectWallet, isConnected, formatAddress, getAddress, onWalletChange } from './modules/wallet.js';
-import { registerRoute, initRouter } from './router.js';
+import { registerRoute, initRouter, refreshCurrentPage } from './router.js';
 import { renderMintPage } from './pages/mint.js';
 import { renderStakingPage } from './pages/staking.js';
 import { renderMysteryBoxPage } from './pages/mysterybox.js';
 import { renderDashboardPage } from './pages/dashboard.js';
+import { renderSwapPage } from './pages/swap.js';
 import { showToast, handleError } from './modules/utils.js';
 
 // ── 初始化应用 ──
@@ -31,6 +32,10 @@ function init() {
           <li><a href="#/mysterybox" class="nav-link" id="nav-mysterybox">
             <span class="nav-link-icon">🎁</span>
             <span class="nav-link-text">盲盒</span>
+          </a></li>
+          <li><a href="#/swap" class="nav-link" id="nav-swap">
+            <span class="nav-link-icon">🔄</span>
+            <span class="nav-link-text">兑换</span>
           </a></li>
           <li><a href="#/dashboard" class="nav-link" id="nav-dashboard">
             <span class="nav-link-icon">📊</span>
@@ -73,6 +78,8 @@ function init() {
       label.textContent = '连接钱包';
       btn.classList.remove('connected');
     }
+    // 重新渲染当前页面
+    refreshCurrentPage();
   });
 
   // ── Logo 点击回首页 ──
@@ -84,6 +91,7 @@ function init() {
   registerRoute('/mint', renderMintPage);
   registerRoute('/staking', renderStakingPage);
   registerRoute('/mysterybox', renderMysteryBoxPage);
+  registerRoute('/swap', renderSwapPage);
   registerRoute('/dashboard', renderDashboardPage);
 
   initRouter();

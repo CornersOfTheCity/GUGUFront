@@ -26,6 +26,7 @@ const routes = {
 };
 
 let currentCleanup = null;
+let handleRoute = null;
 
 function init() {
   const app = document.getElementById('app');
@@ -96,10 +97,12 @@ function init() {
       label.textContent = '连接钱包';
       btn.classList.remove('connected');
     }
+    // 重新渲染当前页面
+    handleRoute();
   });
 
   // 路由
-  const handleRoute = async () => {
+  handleRoute = async () => {
     const hash = window.location.hash || '#/token';
     const path = hash.replace('#', '');
     const renderFn = routes[path] || routes['/token'];

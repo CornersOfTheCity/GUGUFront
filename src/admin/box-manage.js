@@ -24,8 +24,20 @@ export async function renderBoxManage(container) {
             <span class="admin-info-value mono">${MysteryBox_ADDRESS}</span>
           </div>
           <div class="admin-info-row">
-            <span class="admin-info-label">盲盒价格</span>
+            <span class="admin-info-label">当前价格</span>
             <span class="admin-info-value" id="box-cur-price">—</span>
+          </div>
+          <div class="admin-info-row">
+            <span class="admin-info-label">基础价格</span>
+            <span class="admin-info-value" id="box-base-price">—</span>
+          </div>
+          <div class="admin-info-row">
+            <span class="admin-info-label">最高价格</span>
+            <span class="admin-info-value" id="box-max-price">—</span>
+          </div>
+          <div class="admin-info-row">
+            <span class="admin-info-label">已开盒总数</span>
+            <span class="admin-info-value" id="box-total-opened">—</span>
           </div>
           <div class="admin-info-row">
             <span class="admin-info-label">Founder 概率</span>
@@ -55,13 +67,25 @@ export async function renderBoxManage(container) {
 
         <!-- 设置价格 -->
         <div class="card">
-          <div class="admin-section-title">💰 设置盲盒价格</div>
+          <div class="admin-section-title">💰 价格设置</div>
           <div class="admin-form">
-            <div class="form-group">
-              <label class="form-label">新价格 (GUGU)</label>
-              <input class="input" id="new-box-price" type="number" placeholder="100" />
+            <div class="admin-form-row">
+              <div class="form-group">
+                <label class="form-label">基础价格 (GUGU)</label>
+                <input class="input" id="new-box-price" type="number" placeholder="100" />
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-set-price">更新</button>
             </div>
-            <button class="btn btn-primary" id="btn-set-price">更新价格</button>
+            <div class="admin-form-row">
+              <div class="form-group">
+                <label class="form-label">最高价格 (GUGU)</label>
+                <input class="input" id="new-max-price" type="number" placeholder="500" />
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-set-max-price">更新</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
+              公式: price = min(basePrice × (1 + tier × 0.5), maxPrice)，tier = 已开盒数 / 1000
+            </p>
           </div>
         </div>
 
@@ -135,7 +159,7 @@ export async function renderBoxManage(container) {
     });
   });
 
-  // 设置价格
+  // 设置基础价格
   document.getElementById('btn-set-price').addEventListener('click', async () => {
     if (!isConnected()) return showToast('请先连接钱包', 'error');
     const btn = document.getElementById('btn-set-price');
@@ -145,11 +169,28 @@ export async function renderBoxManage(container) {
       if (!price) return showToast('请填写价格', 'error');
       const signer = getSigner();
       const contract = new Contract(MysteryBox_ADDRESS, MysteryBox_ABI, signer);
-      const tx = await contract.setBoxPrice(parseUnits(price, 18));
-      await waitForTx(tx, `✅ 价格已更新为 ${price} GUGU`);
+      const tx = await contract.setBasePrice(parseUnits(price, 18));
+      await waitForTx(tx, `✅ 基础价格已更新为 ${price} GUGU`);
       loadBoxConfig();
     } catch (err) { handleError(err); }
-    finally { setButtonLoading(btn, false, '更新价格'); }
+    finally { setButtonLoading(btn, false, '更新'); }
+  });
+
+  // 设置最高价格
+  document.getElementById('btn-set-max-price').addEventListener('click', async () => {
+    if (!isConnected()) return showToast('请先连接钱包', 'error');
+    const btn = document.getElementById('btn-set-max-price');
+    try {
+      setButtonLoading(btn, true);
+      const price = document.getElementById('new-max-price').value.trim();
+      if (!price) return showToast('请填写价格', 'error');
+      const signer = getSigner();
+      const contract = new Contract(MysteryBox_ADDRESS, MysteryBox_ABI, signer);
+      const tx = await contract.setMaxPrice(parseUnits(price, 18));
+      await waitForTx(tx, `✅ 最高价格已更新为 ${price} GUGU`);
+      loadBoxConfig();
+    } catch (err) { handleError(err); }
+    finally { setButtonLoading(btn, false, '更新'); }
   });
 
   // 设置概率
@@ -218,9 +259,20 @@ async function loadBoxConfig() {
 
     // 价格
     try {
-      const price = await contract.boxPrice();
+      const [curPrice, basePrice, maxPrice, totalOpened] = await Promise.all([
+        contract.currentBoxPrice(),
+        contract.basePrice(),
+        contract.maxPrice(),
+        contract.totalBoxOpened(),
+      ]);
       const el = document.getElementById('box-cur-price');
-      if (el) el.textContent = fmtToken(price) + ' GUGU';
+      if (el) el.textContent = fmtToken(curPrice) + ' GUGU';
+      const el2 = document.getElementById('box-base-price');
+      if (el2) el2.textContent = fmtToken(basePrice) + ' GUGU';
+      const el3 = document.getElementById('box-max-price');
+      if (el3) el3.textContent = fmtToken(maxPrice) + ' GUGU';
+      const el4 = document.getElementById('box-total-opened');
+      if (el4) el4.textContent = Number(totalOpened).toLocaleString();
     } catch {}
 
     // 概率

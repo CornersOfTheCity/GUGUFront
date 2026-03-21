@@ -7,7 +7,7 @@ import { getSigner, isConnected, getProvider } from '../modules/wallet.js';
 import {
   GUGUNFT_ADDRESS, GUGUNFT_ABI,
   RARITY_NAMES, RARITY_EMOJIS,
-  MINT_PRICES_ETH, MAX_SUPPLY, DAILY_REWARDS,
+  MINT_PRICES_ETH, DAILY_REWARDS, CHAIN_CURRENCY,
 } from '../config/contracts.js';
 import { waitForTx, handleError, setButtonLoading, showToast } from '../modules/utils.js';
 
@@ -32,14 +32,10 @@ export async function renderMintPage(container) {
               <div class="mint-card-title">${RARITY_NAMES[i]} NFT</div>
 
               <div class="mint-card-price">
-                ${MINT_PRICES_ETH[i]} <span class="eth-label">ETH</span>
+                ${MINT_PRICES_ETH[i]} <span class="eth-label">${CHAIN_CURRENCY}</span>
               </div>
 
-              <div class="mint-card-info">
-                <div class="mint-info-row">
-                  <span class="mint-info-label">最大供应</span>
-                  <span class="mint-info-value">${MAX_SUPPLY[i].toLocaleString()}</span>
-                </div>
+                <div class="mint-card-info">
                 <div class="mint-info-row">
                   <span class="mint-info-label">已铸造</span>
                   <span class="mint-info-value" id="minted-${i}">—</span>
@@ -47,10 +43,6 @@ export async function renderMintPage(container) {
                 <div class="mint-info-row">
                   <span class="mint-info-label">质押日奖励</span>
                   <span class="mint-info-value">${DAILY_REWARDS[i]} GUGU/天</span>
-                </div>
-
-                <div class="progress-bar">
-                  <div class="progress-fill ${rarityClass}" id="progress-${i}" style="width: 0%"></div>
                 </div>
               </div>
 
@@ -87,14 +79,10 @@ async function loadMintProgress() {
     for (let i = 0; i < 3; i++) {
       try {
         const minted = await nftContract.totalSupplyByRarity(i);
-        const max = MAX_SUPPLY[i];
         const mintedNum = Number(minted);
 
         const mintedEl = document.getElementById(`minted-${i}`);
-        const progressEl = document.getElementById(`progress-${i}`);
-
-        if (mintedEl) mintedEl.textContent = `${mintedNum} / ${max}`;
-        if (progressEl) progressEl.style.width = `${(mintedNum / max) * 100}%`;
+        if (mintedEl) mintedEl.textContent = mintedNum;
       } catch {
         // 合约未部署时静默处理
       }

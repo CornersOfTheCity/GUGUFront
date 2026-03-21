@@ -144,7 +144,7 @@ async function loadBoxData() {
     // 盒子价格 & 概率
     const boxContract = new Contract(MysteryBox_ADDRESS, MysteryBox_ABI, provider);
     try {
-      const price = await boxContract.boxPrice();
+      const price = await boxContract.currentBoxPrice();
       const priceEl = document.getElementById('box-price');
       if (priceEl) priceEl.textContent = fmtToken(price);
     } catch {}
@@ -172,8 +172,8 @@ async function loadRequestHistory(boxContract, address) {
   try {
     const provider = getProvider();
     const currentBlock = await provider.getBlockNumber();
-    // 查最近 5000 个区块的事件（可根据链出块速度调整）
-    const fromBlock = Math.max(0, currentBlock - 5000);
+    // BSC ~3秒出块，50000 块 ≈ 42小时
+    const fromBlock = Math.max(0, currentBlock - 50000);
 
     // 按用户地址过滤 BoxRequested 事件
     const buyFilter = boxContract.filters.BoxRequested(address);
@@ -253,7 +253,7 @@ async function handleBuyBox() {
     const boxContract = new Contract(MysteryBox_ADDRESS, MysteryBox_ABI, signer);
 
     // 获取盒子价格
-    const boxPrice = await boxContract.boxPrice();
+    const boxPrice = await boxContract.currentBoxPrice();
     const totalCostWei = boxPrice * BigInt(quantity);
 
     // 检查余额

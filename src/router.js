@@ -46,4 +46,12 @@ export function initRouter() {
 
   window.addEventListener('hashchange', handleRoute);
   handleRoute();
+
+  // 暴露刷新函数
+  refreshCurrentPage = handleRoute;
 }
+
+/**
+ * 刷新当前页面（钱包连接后调用）
+ */
+export let refreshCurrentPage = () => {};

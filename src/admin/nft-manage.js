@@ -6,7 +6,7 @@ import { Contract } from 'ethers';
 import { getSigner, isConnected, getProvider } from '../modules/wallet.js';
 import {
   GUGUNFT_ADDRESS, GUGUNFT_ABI,
-  RARITY_NAMES, RARITY_EMOJIS, MAX_SUPPLY,
+  RARITY_NAMES, RARITY_EMOJIS,
 } from '../config/contracts.js';
 import { fmtEth, waitForTx, handleError, setButtonLoading, showToast } from '../modules/utils.js';
 
@@ -249,7 +249,7 @@ async function loadNftInfo() {
       try {
         const minted = await contract.totalSupplyByRarity(i);
         const mintedEl = document.getElementById(`nft-minted-${i}`);
-        if (mintedEl) mintedEl.textContent = `${Number(minted)} / ${MAX_SUPPLY[i]}`;
+        if (mintedEl) mintedEl.textContent = Number(minted);
       } catch {}
     }
   } catch {}
