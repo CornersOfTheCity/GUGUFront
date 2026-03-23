@@ -5,6 +5,7 @@
 import './style.css';
 import { connectWallet, disconnectWallet, isConnected, formatAddress, getAddress, onWalletChange } from './modules/wallet.js';
 import { registerRoute, initRouter, refreshCurrentPage } from './router.js';
+import { NETWORK_NAME, CHAIN_NAME } from './config/contracts.js';
 import { renderMintPage } from './pages/mint.js';
 import { renderStakingPage } from './pages/staking.js';
 import { renderMysteryBoxPage } from './pages/mysterybox.js';
@@ -42,10 +43,15 @@ function init() {
             <span class="nav-link-text">仪表盘</span>
           </a></li>
         </ul>
-        <button class="btn-connect" id="btn-wallet">
-          <span>🔗</span>
-          <span id="wallet-label">连接钱包</span>
-        </button>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="network-badge ${NETWORK_NAME === 'mainnet' ? 'mainnet' : 'testnet'}">
+            ${NETWORK_NAME === 'mainnet' ? '🟢' : '🟡'} ${CHAIN_NAME}
+          </span>
+          <button class="btn-connect" id="btn-wallet">
+            <span>🔗</span>
+            <span id="wallet-label">连接钱包</span>
+          </button>
+        </div>
       </div>
     </nav>
     <main id="page-content" class="page-container"></main>

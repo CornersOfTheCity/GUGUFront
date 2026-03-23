@@ -6,6 +6,7 @@ import './style.css';
 import './admin/admin.css';
 import { connectWallet, disconnectWallet, isConnected, formatAddress, getAddress, onWalletChange } from './modules/wallet.js';
 import { showToast, handleError } from './modules/utils.js';
+import { NETWORK_NAME, CHAIN_NAME } from './config/contracts.js';
 
 // 导入所有管理页面
 import { renderTokenManage } from './admin/token-manage.js';
@@ -63,10 +64,15 @@ function init() {
             <span class="nav-link-text">空投</span>
           </a></li>
         </ul>
-        <button class="btn-connect" id="btn-wallet">
-          <span>🔗</span>
-          <span id="wallet-label">连接钱包</span>
-        </button>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="network-badge ${NETWORK_NAME === 'mainnet' ? 'mainnet' : 'testnet'}">
+            ${NETWORK_NAME === 'mainnet' ? '🟢' : '🟡'} ${CHAIN_NAME}
+          </span>
+          <button class="btn-connect" id="btn-wallet">
+            <span>🔗</span>
+            <span id="wallet-label">连接钱包</span>
+          </button>
+        </div>
       </div>
     </nav>
     <main id="page-content" class="page-container"></main>

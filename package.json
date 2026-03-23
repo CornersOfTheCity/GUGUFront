@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:testnet": "VITE_NETWORK=testnet vite",
+    "dev:mainnet": "VITE_NETWORK=mainnet vite",
     "build": "vite build",
+    "build:testnet": "VITE_NETWORK=testnet vite build",
+    "build:mainnet": "VITE_NETWORK=mainnet vite build",
     "preview": "vite preview"
   },
   "devDependencies": {

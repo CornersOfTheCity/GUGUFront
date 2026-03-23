@@ -1,22 +1,55 @@
 // ═══════════════════════════════════════════
 //         GUGU DeFi — 合约地址 & ABI
 // ═══════════════════════════════════════════
-// 部署后将实际地址填入此处
 
-export const CHAIN_ID = 97; // BSC Testnet
-export const CHAIN_NAME = 'BSC Testnet';
-export const CHAIN_RPC = 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
-export const CHAIN_EXPLORER = 'https://testnet.bscscan.com';
-export const CHAIN_CURRENCY = 'tBNB';
+// ── 网络配置 ──
 
-// ── 合约地址 (BSC Testnet) ──
+const NETWORKS = {
+  mainnet: {
+    CHAIN_ID: 56,
+    CHAIN_NAME: 'BNB Smart Chain',
+    CHAIN_RPC: 'https://bsc-dataseed1.binance.org',
+    CHAIN_EXPLORER: 'https://bscscan.com',
+    CHAIN_CURRENCY: 'BNB',
+    GUGUToken_ADDRESS:  '0xD3ff9f7F301A7b5e56A2171D09adCBfB8446Df97',
+    GUGUNFT_ADDRESS:    '0x485726cdbc7D388896aaED7aCF9D02f3d7339dff',
+    NFTStaking_ADDRESS: '0x4Fe07dBA8dc600BAD8843FfB0C7C316895145b8D',
+    MysteryBox_ADDRESS: '0xd5A512152B1736a2808dDdB7139E05E445de044B',
+    TokenSwap_ADDRESS:  '0x09FA16f00BBC1557F37F741cCC7Ea3d2dA988F17',
+    Airdrop_ADDRESS:    '0x513DFF2bdccabcc9B65241F1211DC243c11f1684',
+  },
+  testnet: {
+    CHAIN_ID: 97,
+    CHAIN_NAME: 'BSC Testnet',
+    CHAIN_RPC: 'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+    CHAIN_EXPLORER: 'https://testnet.bscscan.com',
+    CHAIN_CURRENCY: 'tBNB',
+    GUGUToken_ADDRESS:  '0x04BdeA7C305aCBdC05072DA1Ce29729d6880f89a',
+    GUGUNFT_ADDRESS:    '0x764f16e89FE34E3DE8Fab2b0f21003a5Ee31210B',
+    NFTStaking_ADDRESS: '0xCee4A2B098d9BfEAe91Bd942Af21Ca257683fE7C',
+    MysteryBox_ADDRESS: '0xf07255d83bAdE34eCf1e64775c30B7D751d5D914',
+    TokenSwap_ADDRESS:  '0x5cD6520090d623695aE44391DB9110F12Af0449E',
+    Airdrop_ADDRESS:    '0xff0b91F7eEE1d6E0771d84369791eCB8876E4567',
+  },
+};
 
-export const GUGUToken_ADDRESS  = '0x04BdeA7C305aCBdC05072DA1Ce29729d6880f89a';
-export const GUGUNFT_ADDRESS    = '0x764f16e89FE34E3DE8Fab2b0f21003a5Ee31210B';
-export const NFTStaking_ADDRESS = '0xCee4A2B098d9BfEAe91Bd942Af21Ca257683fE7C';
-export const MysteryBox_ADDRESS = '0xf07255d83bAdE34eCf1e64775c30B7D751d5D914';
-export const TokenSwap_ADDRESS  = '0x5cD6520090d623695aE44391DB9110F12Af0449E';
-export const Airdrop_ADDRESS    = '0xff0b91F7eEE1d6E0771d84369791eCB8876E4567';
+// 通过 VITE_NETWORK 环境变量选择网络 (默认 testnet)
+const network = import.meta.env.VITE_NETWORK || 'testnet';
+const config = NETWORKS[network] || NETWORKS.testnet;
+
+export const NETWORK_NAME     = network;
+export const CHAIN_ID         = config.CHAIN_ID;
+export const CHAIN_NAME       = config.CHAIN_NAME;
+export const CHAIN_RPC        = config.CHAIN_RPC;
+export const CHAIN_EXPLORER   = config.CHAIN_EXPLORER;
+export const CHAIN_CURRENCY   = config.CHAIN_CURRENCY;
+
+export const GUGUToken_ADDRESS  = config.GUGUToken_ADDRESS;
+export const GUGUNFT_ADDRESS    = config.GUGUNFT_ADDRESS;
+export const NFTStaking_ADDRESS = config.NFTStaking_ADDRESS;
+export const MysteryBox_ADDRESS = config.MysteryBox_ADDRESS;
+export const TokenSwap_ADDRESS  = config.TokenSwap_ADDRESS;
+export const Airdrop_ADDRESS    = config.Airdrop_ADDRESS;
 
 // ── ABI 片段 ──
 
