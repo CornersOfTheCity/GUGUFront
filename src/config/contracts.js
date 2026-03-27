@@ -15,7 +15,7 @@ const NETWORKS = {
     GUGUNFT_ADDRESS:    '0x485726cdbc7D388896aaED7aCF9D02f3d7339dff',
     NFTStaking_ADDRESS: '0x4Fe07dBA8dc600BAD8843FfB0C7C316895145b8D',
     MysteryBox_ADDRESS: '0xd5A512152B1736a2808dDdB7139E05E445de044B',
-    TokenSwap_ADDRESS:  '0x09FA16f00BBC1557F37F741cCC7Ea3d2dA988F17',
+    TokenSwap_ADDRESS:  '0x923d923d5b4201d1F6cb38Acc7159C7dAdB76A52',
     Airdrop_ADDRESS:    '0x513DFF2bdccabcc9B65241F1211DC243c11f1684',
   },
   testnet: {
@@ -138,21 +138,24 @@ export const MysteryBox_ABI = [
 ];
 
 export const TokenSwap_ABI = [
-  'function swap(uint256 pairId, address fromToken, uint256 amount) external',
-  'function getAmountOut(uint256 pairId, address fromToken, uint256 amountIn) external view returns (uint256 amountOut, uint256 fee)',
-  'function pairCount() external view returns (uint256)',
-  'function getPair(uint256 pairId) external view returns (tuple(address tokenA, address tokenB, uint256 rateAtoB, uint256 rateBtoA, bool active))',
-  'function feeRate() external view returns (uint256)',
+  // ── User Functions ──
+  'function buy(uint256 payAmount) external',
+  'function getAmountOut(uint256 payAmount) external view returns (uint256)',
+  'function remainingSupply() external view returns (uint256)',
+  'function saleToken() external view returns (address)',
+  'function payToken() external view returns (address)',
+  'function price() external view returns (uint256)',
+  'function paused() external view returns (bool)',
   // ── Admin ──
   'function owner() external view returns (address)',
-  'function feeRecipient() external view returns (address)',
-  'function addPair(address tokenA, address tokenB, uint256 rateAtoB, uint256 rateBtoA) external returns (uint256)',
-  'function updatePairRates(uint256 pairId, uint256 rateAtoB, uint256 rateBtoA) external',
-  'function setPairActive(uint256 pairId, bool active) external',
-  'function addLiquidity(uint256 pairId, address token, uint256 amount) external',
-  'function removeLiquidity(uint256 pairId, address token, uint256 amount) external',
-  'function setFeeRate(uint256 feeRate) external',
-  'function setFeeRecipient(address feeRecipient) external',
+  'function setPrice(uint256 _price) external',
+  'function setPaused(bool _paused) external',
+  'function withdrawToken(address token, uint256 amount) external',
+  'function withdrawETH() external',
+  // ── Events ──
+  'event TokensPurchased(address indexed buyer, uint256 payAmount, uint256 saleAmount)',
+  'event PriceUpdated(uint256 oldPrice, uint256 newPrice)',
+  'event SalePaused(bool paused)',
 ];
 
 // ── 稀有度常量 ──

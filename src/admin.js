@@ -4,7 +4,7 @@
 
 import './style.css';
 import './admin/admin.css';
-import { connectWallet, disconnectWallet, isConnected, formatAddress, getAddress, onWalletChange } from './modules/wallet.js';
+import { connectWallet, disconnectWallet, isConnected, formatAddress, getAddress, onWalletChange, tryAutoConnect } from './modules/wallet.js';
 import { showToast, handleError } from './modules/utils.js';
 import { NETWORK_NAME, CHAIN_NAME } from './config/contracts.js';
 
@@ -85,7 +85,14 @@ function init() {
         disconnectWallet();
         showToast('钱包已断开', 'info');
       } else {
-        await connectWallet();
+        const addr = await connectWallet();
+        // 直接更新 UI，确保即时显示
+        const label = document.getElementById('wallet-label');
+        const btn = document.getElementById('btn-wallet');
+        if (addr && label && btn) {
+          label.textContent = formatAddress(addr);
+          btn.classList.add('connected');
+        }
         showToast('钱包已连接', 'success');
       }
     } catch (err) {
@@ -127,6 +134,9 @@ function init() {
 
   window.addEventListener('hashchange', handleRoute);
   handleRoute();
+
+  // 页面加载时尝试自动重连（不弹窗）
+  tryAutoConnect();
 }
 
 document.addEventListener('DOMContentLoaded', init);

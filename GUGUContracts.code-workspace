@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../contracts/GUGUContracts"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../../go/src/GUGUBackend"
+		}
+	],
+	"settings": {}
+}

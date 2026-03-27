@@ -1,44 +1,40 @@
 // ═══════════════════════════════════════════
-//          Token Swap Page
+//          Token Sale Page (Buy GUGU)
 // ═══════════════════════════════════════════
 
 import { Contract, parseUnits, formatUnits } from 'ethers';
 import { getSigner, isConnected, getProvider, getAddress } from '../modules/wallet.js';
 import {
   TokenSwap_ADDRESS, TokenSwap_ABI,
-  GUGUToken_ADDRESS, GUGUToken_ABI,
+  GUGUToken_ABI,
 } from '../config/contracts.js';
 import { fmtToken, waitForTx, handleError, setButtonLoading, showToast } from '../modules/utils.js';
 
 // ── State ──
-let pairs = [];
-let selectedPairId = 0;
-let isReversed = false; // false = A→B, true = B→A
+let saleTokenAddr = null;
+let payTokenAddr = null;
+let saleSymbol = 'GUGU';
+let paySymbol = 'USDT';
+let saleDecimals = 18;
+let payDecimals = 18;
+let currentPrice = 0n;
+let isPaused = false;
 let debounceTimer = null;
-const symbolCache = {}; // address -> symbol
 
 export async function renderSwapPage(container) {
   container.innerHTML = `
     <div class="fade-in">
       <div class="page-header">
-        <h1 class="page-title">代币兑换</h1>
-        <p class="page-subtitle">按固定汇率在代币之间快速兑换，低手续费</p>
+        <h1 class="page-title">购买 GUGU</h1>
+        <p class="page-subtitle">使用稳定币购买 GUGU 代币，固定价格，即时到账</p>
       </div>
 
       <div class="swap-container">
         <div class="card card-glass swap-card slide-up">
-          <!-- Pair selector -->
-          <div class="swap-pair-selector" id="pair-selector-area">
-            <label class="swap-label">交易对</label>
-            <select class="input swap-select" id="pair-select">
-              <option value="">加载中...</option>
-            </select>
-          </div>
-
-          <!-- From -->
+          <!-- From: Pay token -->
           <div class="swap-input-group">
             <div class="swap-input-header">
-              <span class="swap-label" id="from-label">支出</span>
+              <span class="swap-label" id="from-label">支付</span>
               <span class="swap-balance" id="from-balance">余额: —</span>
             </div>
             <div class="swap-input-row">
@@ -48,14 +44,14 @@ export async function renderSwapPage(container) {
             <button class="btn btn-ghost btn-sm swap-max-btn" id="max-btn">MAX</button>
           </div>
 
-          <!-- Direction toggle -->
+          <!-- Direction indicator (static, no toggle) -->
           <div class="swap-direction-wrapper">
-            <button class="swap-direction-btn" id="direction-btn" title="切换方向">
-              <span class="swap-direction-icon">⇅</span>
-            </button>
+            <div class="swap-direction-btn" style="cursor: default;">
+              <span class="swap-direction-icon">↓</span>
+            </div>
           </div>
 
-          <!-- To -->
+          <!-- To: Sale token (GUGU) -->
           <div class="swap-input-group">
             <div class="swap-input-header">
               <span class="swap-label" id="to-label">获得</span>
@@ -70,22 +66,18 @@ export async function renderSwapPage(container) {
           <!-- Details -->
           <div class="swap-details" id="swap-details" style="display:none">
             <div class="swap-detail-row">
-              <span>汇率</span>
+              <span>单价</span>
               <span id="swap-rate">—</span>
             </div>
             <div class="swap-detail-row">
-              <span>手续费</span>
-              <span id="swap-fee">—</span>
-            </div>
-            <div class="swap-detail-row">
-              <span>手续费率</span>
-              <span id="swap-fee-rate">—</span>
+              <span>剩余供应</span>
+              <span id="swap-remaining">—</span>
             </div>
           </div>
 
-          <!-- Swap button -->
+          <!-- Buy button -->
           <button class="btn btn-primary btn-lg btn-full swap-action-btn" id="swap-btn" disabled>
-            选择交易对
+            加载中...
           </button>
         </div>
 
@@ -93,12 +85,16 @@ export async function renderSwapPage(container) {
         <div class="swap-stats slide-up" style="animation-delay:0.15s">
           <div class="stats-grid">
             <div class="card stat-card">
-              <div class="stat-value" id="stat-pairs">—</div>
-              <div class="stat-label">交易对数量</div>
+              <div class="stat-value" id="stat-price">—</div>
+              <div class="stat-label">GUGU 单价</div>
             </div>
             <div class="card stat-card">
-              <div class="stat-value" id="stat-fee-rate">—</div>
-              <div class="stat-label">手续费率</div>
+              <div class="stat-value" id="stat-remaining">—</div>
+              <div class="stat-label">剩余可售</div>
+            </div>
+            <div class="card stat-card">
+              <div class="stat-value" id="stat-status">—</div>
+              <div class="stat-label">销售状态</div>
             </div>
           </div>
         </div>
@@ -107,15 +103,12 @@ export async function renderSwapPage(container) {
   `;
 
   // ── Load data ──
-  await loadPairs();
-  await loadFeeRate();
+  await loadSaleInfo();
 
   // ── Event listeners ──
-  document.getElementById('pair-select').addEventListener('change', onPairChange);
-  document.getElementById('direction-btn').addEventListener('click', toggleDirection);
   document.getElementById('from-amount').addEventListener('input', onAmountInput);
   document.getElementById('max-btn').addEventListener('click', onMaxClick);
-  document.getElementById('swap-btn').addEventListener('click', handleSwap);
+  document.getElementById('swap-btn').addEventListener('click', handleBuy);
 
   return () => {
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -126,147 +119,75 @@ export async function renderSwapPage(container) {
 //            Load Contract Data
 // ═══════════════════════════════════════════
 
-async function loadPairs() {
+async function loadSaleInfo() {
   try {
     const provider = getProvider();
     if (!provider) {
-      setPairOptions([]);
+      updateBtnState();
       return;
     }
 
     const swap = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, provider);
-    const count = Number(await swap.pairCount());
+    const ERC20_META = [
+      'function symbol() view returns (string)',
+      'function decimals() view returns (uint8)',
+    ];
 
-    document.getElementById('stat-pairs').textContent = count;
+    // Read contract state
+    const [saleTkn, payTkn, price, paused, remaining] = await Promise.all([
+      swap.saleToken(),
+      swap.payToken(),
+      swap.price(),
+      swap.paused(),
+      swap.remainingSupply(),
+    ]);
 
-    pairs = [];
-    for (let i = 0; i < count; i++) {
-      const pair = await swap.getPair(i);
-      pairs.push({
-        id: i,
-        tokenA: pair.tokenA,
-        tokenB: pair.tokenB,
-        rateAtoB: pair.rateAtoB,
-        rateBtoA: pair.rateBtoA,
-        active: pair.active,
-      });
+    saleTokenAddr = saleTkn;
+    payTokenAddr = payTkn;
+    currentPrice = price;
+    isPaused = paused;
 
-      // Fetch and cache token symbols
-      await fetchTokenSymbol(pair.tokenA, provider);
-      await fetchTokenSymbol(pair.tokenB, provider);
-    }
+    // Fetch token metadata
+    try {
+      const saleContract = new Contract(saleTkn, ERC20_META, provider);
+      saleSymbol = await saleContract.symbol();
+      saleDecimals = Number(await saleContract.decimals());
+    } catch { saleSymbol = 'GUGU'; saleDecimals = 18; }
 
-    setPairOptions(pairs);
+    try {
+      const payContract = new Contract(payTkn, ERC20_META, provider);
+      paySymbol = await payContract.symbol();
+      payDecimals = Number(await payContract.decimals());
+    } catch { paySymbol = 'USDT'; payDecimals = 18; }
 
-    if (pairs.length > 0) {
-      selectedPairId = 0;
-      isReversed = false;
-      updateTokenDisplay();
-      loadBalances();
-    }
-  } catch {
-    setPairOptions([]);
-    document.getElementById('stat-pairs').textContent = '0';
-  }
-}
+    // Update token labels
+    document.getElementById('from-token-name').textContent = paySymbol;
+    document.getElementById('to-token-name').textContent = saleSymbol;
 
-async function fetchTokenSymbol(address, provider) {
-  if (symbolCache[address.toLowerCase()]) return;
-  // Known tokens
-  if (address.toLowerCase() === GUGUToken_ADDRESS.toLowerCase()) {
-    symbolCache[address.toLowerCase()] = 'GUGU';
-    return;
-  }
-  try {
-    const tokenContract = new Contract(address, ['function symbol() view returns (string)'], provider);
-    const sym = await tokenContract.symbol();
-    symbolCache[address.toLowerCase()] = sym;
-  } catch {
-    symbolCache[address.toLowerCase()] = address.slice(0, 6) + '…' + address.slice(-4);
-  }
-}
+    // Update price display
+    const priceFormatted = formatUnits(currentPrice, 18);
+    const priceNum = parseFloat(priceFormatted);
+    document.getElementById('swap-rate').textContent = `1 ${saleSymbol} = ${priceNum} ${paySymbol}`;
+    document.getElementById('stat-price').textContent = `${priceNum} ${paySymbol}`;
 
-async function loadFeeRate() {
-  try {
-    const provider = getProvider();
-    if (!provider) return;
+    // Update remaining supply
+    const remainingFormatted = fmtToken(remaining, saleDecimals);
+    document.getElementById('swap-remaining').textContent = `${remainingFormatted} ${saleSymbol}`;
+    document.getElementById('stat-remaining').textContent = remainingFormatted;
 
-    const swap = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, provider);
-    const feeRate = Number(await swap.feeRate());
-    const pct = (feeRate / 100).toFixed(2) + '%';
+    // Update status
+    document.getElementById('stat-status').textContent = isPaused ? '⏸ 已暂停' : '🟢 销售中';
 
-    document.getElementById('stat-fee-rate').textContent = pct;
-    const feeRateEl = document.getElementById('swap-fee-rate');
-    if (feeRateEl) feeRateEl.textContent = pct;
-  } catch {
-    // silently handle
-  }
-}
+    // Load user balances
+    await loadBalances();
 
-function setPairOptions(pairList) {
-  const select = document.getElementById('pair-select');
-  if (pairList.length === 0) {
-    select.innerHTML = '<option value="">暂无交易对</option>';
-    document.getElementById('swap-btn').textContent = '暂无可用交易对';
-    return;
-  }
+    // Show details section
+    document.getElementById('swap-details').style.display = '';
 
-  select.innerHTML = pairList.map((p, i) => {
-    const labelA = shortAddr(p.tokenA);
-    const labelB = shortAddr(p.tokenB);
-    const status = p.active ? '' : ' (已暂停)';
-    return `<option value="${i}">${getTokenSymbol(p.tokenA)} ⇄ ${getTokenSymbol(p.tokenB)}${status}</option>`;
-  }).join('');
-}
-
-// ═══════════════════════════════════════════
-//            UI Update Helpers
-// ═══════════════════════════════════════════
-
-function getTokenSymbol(address) {
-  return symbolCache[address.toLowerCase()] || shortAddr(address);
-}
-
-function shortAddr(addr) {
-  return addr.slice(0, 6) + '…' + addr.slice(-4);
-}
-
-function getFromToken() {
-  const pair = pairs[selectedPairId];
-  if (!pair) return null;
-  return isReversed ? pair.tokenB : pair.tokenA;
-}
-
-function getToToken() {
-  const pair = pairs[selectedPairId];
-  if (!pair) return null;
-  return isReversed ? pair.tokenA : pair.tokenB;
-}
-
-function updateTokenDisplay() {
-  const fromToken = getFromToken();
-  const toToken = getToToken();
-  if (!fromToken || !toToken) return;
-
-  document.getElementById('from-token-name').textContent = getTokenSymbol(fromToken);
-  document.getElementById('to-token-name').textContent = getTokenSymbol(toToken);
-
-  // Update rate display
-  const pair = pairs[selectedPairId];
-  const rate = isReversed ? pair.rateBtoA : pair.rateAtoB;
-  const rateFormatted = formatUnits(rate, 18);
-  const rateEl = document.getElementById('swap-rate');
-  if (rateEl) {
-    rateEl.textContent = `1 ${getTokenSymbol(fromToken)} = ${parseFloat(rateFormatted).toLocaleString('en-US', { maximumFractionDigits: 6 })} ${getTokenSymbol(toToken)}`;
-  }
-
-  // Update swap button
-  const btn = document.getElementById('swap-btn');
-  if (pair.active) {
-    btn.textContent = '兑换';
-  } else {
-    btn.textContent = '交易对已暂停';
-    btn.disabled = true;
+    updateBtnState();
+  } catch (err) {
+    console.error('loadSaleInfo error:', err);
+    updateBtnState();
   }
 }
 
@@ -274,25 +195,21 @@ async function loadBalances() {
   try {
     const provider = getProvider();
     const address = getAddress();
-    if (!provider || !address) return;
+    if (!provider || !address || !payTokenAddr || !saleTokenAddr) return;
 
-    const fromToken = getFromToken();
-    const toToken = getToToken();
-    if (!fromToken || !toToken) return;
-
-    const fromContract = new Contract(fromToken, GUGUToken_ABI, provider);
-    const toContract = new Contract(toToken, GUGUToken_ABI, provider);
+    const payContract = new Contract(payTokenAddr, GUGUToken_ABI, provider);
+    const saleContract = new Contract(saleTokenAddr, GUGUToken_ABI, provider);
 
     try {
-      const fromBal = await fromContract.balanceOf(address);
-      document.getElementById('from-balance').textContent = `余额: ${fmtToken(fromBal)}`;
+      const payBal = await payContract.balanceOf(address);
+      document.getElementById('from-balance').textContent = `余额: ${fmtToken(payBal, payDecimals)}`;
     } catch {
       document.getElementById('from-balance').textContent = '余额: —';
     }
 
     try {
-      const toBal = await toContract.balanceOf(address);
-      document.getElementById('to-balance').textContent = `余额: ${fmtToken(toBal)}`;
+      const saleBal = await saleContract.balanceOf(address);
+      document.getElementById('to-balance').textContent = `余额: ${fmtToken(saleBal, saleDecimals)}`;
     } catch {
       document.getElementById('to-balance').textContent = '余额: —';
     }
@@ -301,41 +218,31 @@ async function loadBalances() {
   }
 }
 
+function updateBtnState() {
+  const btn = document.getElementById('swap-btn');
+  if (!btn) return;
+
+  if (!isConnected()) {
+    btn.textContent = '请先连接钱包';
+    btn.disabled = true;
+  } else if (isPaused) {
+    btn.textContent = '销售已暂停';
+    btn.disabled = true;
+  } else {
+    btn.textContent = '输入金额';
+    btn.disabled = true;
+  }
+}
+
 // ═══════════════════════════════════════════
 //            Event Handlers
 // ═══════════════════════════════════════════
 
-function onPairChange(e) {
-  selectedPairId = Number(e.target.value);
-  isReversed = false;
-  updateTokenDisplay();
-  loadBalances();
-  clearAmounts();
-}
-
-function toggleDirection() {
-  isReversed = !isReversed;
-  updateTokenDisplay();
-  loadBalances();
-
-  // Animate
-  const btn = document.getElementById('direction-btn');
-  btn.classList.add('swap-direction-spin');
-  setTimeout(() => btn.classList.remove('swap-direction-spin'), 300);
-
-  // Recalculate if there's an amount
-  const fromVal = document.getElementById('from-amount').value;
-  if (fromVal) {
-    fetchQuote(fromVal);
-  } else {
-    clearAmounts();
-  }
-}
-
 function onAmountInput(e) {
   const val = e.target.value;
   if (!val || parseFloat(val) <= 0) {
-    clearAmounts();
+    document.getElementById('to-amount').value = '';
+    updateBtnState();
     return;
   }
 
@@ -353,12 +260,11 @@ async function onMaxClick() {
       return;
     }
 
-    const fromToken = getFromToken();
-    if (!fromToken) return;
+    if (!payTokenAddr) return;
 
-    const tokenContract = new Contract(fromToken, GUGUToken_ABI, provider);
+    const tokenContract = new Contract(payTokenAddr, GUGUToken_ABI, provider);
     const balance = await tokenContract.balanceOf(address);
-    const formatted = formatUnits(balance, 18);
+    const formatted = formatUnits(balance, payDecimals);
 
     document.getElementById('from-amount').value = formatted;
     fetchQuote(formatted);
@@ -370,52 +276,34 @@ async function onMaxClick() {
 async function fetchQuote(amountStr) {
   try {
     const provider = getProvider();
-    if (!provider || pairs.length === 0) return;
+    if (!provider || currentPrice === 0n) return;
 
     const swap = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, provider);
-    const fromToken = getFromToken();
-    const amountIn = parseUnits(amountStr, 18);
+    const payAmount = parseUnits(amountStr, payDecimals);
 
-    const [amountOut, fee] = await swap.getAmountOut(selectedPairId, fromToken, amountIn);
+    const amountOut = await swap.getAmountOut(payAmount);
 
-    document.getElementById('to-amount').value = parseFloat(formatUnits(amountOut, 18)).toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: false });
-    document.getElementById('swap-fee').textContent = fmtToken(fee) + ' ' + getTokenSymbol(getToToken());
+    document.getElementById('to-amount').value = parseFloat(formatUnits(amountOut, saleDecimals)).toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: false });
 
-    // Show details
-    document.getElementById('swap-details').style.display = '';
-
-    // Enable swap button
+    // Enable buy button
     const btn = document.getElementById('swap-btn');
-    const pair = pairs[selectedPairId];
-    if (pair && pair.active && parseFloat(amountStr) > 0) {
+    if (!isPaused && isConnected() && parseFloat(amountStr) > 0) {
       btn.disabled = false;
-      btn.textContent = '兑换';
+      btn.textContent = '购买 ' + saleSymbol;
     }
   } catch (err) {
     document.getElementById('to-amount').value = '';
-    document.getElementById('swap-details').style.display = 'none';
     const btn = document.getElementById('swap-btn');
     btn.disabled = true;
-    btn.textContent = '流动性不足或输入无效';
-  }
-}
-
-function clearAmounts() {
-  document.getElementById('to-amount').value = '';
-  document.getElementById('swap-details').style.display = 'none';
-  const btn = document.getElementById('swap-btn');
-  const pair = pairs[selectedPairId];
-  if (pair && pair.active) {
-    btn.textContent = '输入金额';
-    btn.disabled = true;
+    btn.textContent = '供应不足或输入无效';
   }
 }
 
 // ═══════════════════════════════════════════
-//            Execute Swap
+//            Execute Buy
 // ═══════════════════════════════════════════
 
-async function handleSwap() {
+async function handleBuy() {
   if (!isConnected()) {
     showToast('请先连接钱包', 'error');
     return;
@@ -423,49 +311,49 @@ async function handleSwap() {
 
   const amountStr = document.getElementById('from-amount').value;
   if (!amountStr || parseFloat(amountStr) <= 0) {
-    showToast('请输入兑换数量', 'error');
+    showToast('请输入支付数量', 'error');
     return;
   }
 
-  const pair = pairs[selectedPairId];
-  if (!pair || !pair.active) {
-    showToast('交易对不可用', 'error');
+  if (isPaused) {
+    showToast('销售已暂停', 'error');
     return;
   }
 
   const btn = document.getElementById('swap-btn');
-  const originalText = '兑换';
+  const originalText = '购买 ' + saleSymbol;
 
   try {
     setButtonLoading(btn, true);
 
     const signer = getSigner();
-    const fromToken = getFromToken();
-    const amountIn = parseUnits(amountStr, 18);
+    const payAmount = parseUnits(amountStr, payDecimals);
 
-    // 1. Check & approve
-    const tokenContract = new Contract(fromToken, GUGUToken_ABI, signer);
+    // 1. Check & approve pay token
+    const tokenContract = new Contract(payTokenAddr, GUGUToken_ABI, signer);
     const allowance = await tokenContract.allowance(getAddress(), TokenSwap_ADDRESS);
 
-    if (allowance < amountIn) {
-      showToast('授权代币中...', 'info');
-      const approveTx = await tokenContract.approve(TokenSwap_ADDRESS, amountIn);
+    if (allowance < payAmount) {
+      showToast('授权 ' + paySymbol + ' 中...', 'info');
+      const approveTx = await tokenContract.approve(TokenSwap_ADDRESS, payAmount);
       await approveTx.wait();
       showToast('授权成功！', 'success');
     }
 
-    // 2. Swap
+    // 2. Buy
     const swapContract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-    const tx = await swapContract.swap(selectedPairId, fromToken, amountIn);
+    const tx = await swapContract.buy(payAmount);
 
-    const toSymbol = getTokenSymbol(getToToken());
-    const fromSymbol = getTokenSymbol(fromToken);
-    await waitForTx(tx, `🎉 成功将 ${amountStr} ${fromSymbol} 兑换为 ${toSymbol}！`);
+    const expectedOut = document.getElementById('to-amount').value;
+    await waitForTx(tx, `🎉 成功使用 ${amountStr} ${paySymbol} 购买了 ${expectedOut} ${saleSymbol}！`);
 
     // 3. Refresh
     document.getElementById('from-amount').value = '';
-    clearAmounts();
+    document.getElementById('to-amount').value = '';
+    updateBtnState();
     loadBalances();
+    // Refresh remaining supply
+    loadSaleInfo();
   } catch (err) {
     handleError(err);
   } finally {

@@ -1,18 +1,23 @@
 // ═══════════════════════════════════════════
-//      Admin — Swap 管理
+//      Admin — Token Sale 管理
 // ═══════════════════════════════════════════
 
 import { Contract, parseUnits, formatUnits } from 'ethers';
 import { getSigner, isConnected, getAddress, getProvider } from '../modules/wallet.js';
 import { TokenSwap_ADDRESS, TokenSwap_ABI, GUGUToken_ABI } from '../config/contracts.js';
-import { waitForTx, handleError, setButtonLoading, showToast } from '../modules/utils.js';
+import { fmtToken, waitForTx, handleError, setButtonLoading, showToast } from '../modules/utils.js';
+
+let saleSymbol = 'GUGU';
+let paySymbol = 'USDT';
+let saleDecimals = 18;
+let payDecimals = 18;
 
 export async function renderSwapManage(container) {
   container.innerHTML = `
     <div class="fade-in">
       <div class="page-header">
-        <h1 class="page-title">🔄 Swap 管理</h1>
-        <p class="page-subtitle">管理交易对、流动性、手续费</p>
+        <h1 class="page-title">🔄 代币销售管理</h1>
+        <p class="page-subtitle">管理 GUGU 代币销售：价格、暂停、提取</p>
       </div>
 
       <div class="admin-grid">
@@ -28,107 +33,74 @@ export async function renderSwapManage(container) {
             <span class="admin-info-value mono" id="swap-owner">—</span>
           </div>
           <div class="admin-info-row">
-            <span class="admin-info-label">手续费率</span>
-            <span class="admin-info-value" id="swap-fee-rate">—</span>
+            <span class="admin-info-label">销售代币</span>
+            <span class="admin-info-value mono" id="swap-sale-token">—</span>
           </div>
           <div class="admin-info-row">
-            <span class="admin-info-label">手续费接收地址</span>
-            <span class="admin-info-value mono" id="swap-fee-recipient">—</span>
+            <span class="admin-info-label">支付代币</span>
+            <span class="admin-info-value mono" id="swap-pay-token">—</span>
           </div>
           <div class="admin-info-row">
-            <span class="admin-info-label">交易对数量</span>
-            <span class="admin-info-value" id="swap-pair-count">—</span>
+            <span class="admin-info-label">当前价格</span>
+            <span class="admin-info-value" id="swap-price">—</span>
+          </div>
+          <div class="admin-info-row">
+            <span class="admin-info-label">剩余供应</span>
+            <span class="admin-info-value" id="swap-remaining">—</span>
+          </div>
+          <div class="admin-info-row">
+            <span class="admin-info-label">销售状态</span>
+            <span class="admin-info-value" id="swap-paused">—</span>
           </div>
         </div>
 
-        <!-- 手续费管理 -->
+        <!-- 价格管理 -->
         <div class="card">
-          <div class="admin-section-title">💸 手续费管理</div>
+          <div class="admin-section-title">💰 价格管理</div>
           <div class="admin-form">
             <div class="admin-form-row">
               <div class="form-group">
-                <label class="form-label">手续费率 (‱, 最大 1000=10%)</label>
-                <input class="input" id="new-fee-rate" type="number" placeholder="30 = 0.3%" />
+                <label class="form-label">新价格 (1 GUGU = ? USDT，1e18 精度)</label>
+                <input class="input" id="new-price" type="text" placeholder="如 0.1 表示 1 GUGU = 0.1 USDT" />
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">
+                  输入人类可读数字，如 0.1, 0.05, 1 等
+                </p>
               </div>
-              <button class="btn btn-primary btn-sm" id="btn-set-fee-rate">更新</button>
-            </div>
-            <div class="admin-form-row">
-              <div class="form-group">
-                <label class="form-label">手续费接收地址</label>
-                <input class="input" id="new-fee-recipient" placeholder="0x..." />
-              </div>
-              <button class="btn btn-primary btn-sm" id="btn-set-fee-recipient">更新</button>
+              <button class="btn btn-primary btn-sm" id="btn-set-price">更新价格</button>
             </div>
           </div>
         </div>
 
-        <!-- 添加交易对 -->
+        <!-- 暂停/恢复 -->
         <div class="card">
-          <div class="admin-section-title">➕ 添加交易对</div>
+          <div class="admin-section-title">⏸ 销售控制</div>
           <div class="admin-form">
             <div class="admin-form-row">
-              <div class="form-group">
-                <label class="form-label">Token A 地址</label>
-                <input class="input" id="pair-token-a" placeholder="0x..." />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Token B 地址</label>
-                <input class="input" id="pair-token-b" placeholder="0x..." />
-              </div>
+              <button class="btn btn-accent" id="btn-pause">暂停销售</button>
+              <button class="btn btn-primary" id="btn-resume">恢复销售</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 提取资金 -->
+        <div class="card">
+          <div class="admin-section-title">💸 提取资金</div>
+          <div class="admin-form">
+            <div class="form-group">
+              <label class="form-label">代币地址</label>
+              <input class="input" id="withdraw-token" placeholder="0x... (ERC-20 代币地址)" />
             </div>
             <div class="form-group">
-              <label class="form-label">汇率设置</label>
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <input class="input" id="pair-qty-a" type="number" placeholder="1" style="flex: 1; text-align: center;" />
-                <span style="font-size: 0.8rem; color: var(--text-secondary);">Token A</span>
-                <span style="font-size: 1.2rem; font-weight: 700; color: var(--primary-light);">＝</span>
-                <input class="input" id="pair-qty-b" type="number" placeholder="10" style="flex: 1; text-align: center;" />
-                <span style="font-size: 0.8rem; color: var(--text-secondary);">Token B</span>
-              </div>
-              <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">
-                例如: 1 GUGU ＝ 10 USDT
-              </p>
-            </div>
-            <button class="btn btn-accent" id="btn-add-pair">添加交易对</button>
-          </div>
-        </div>
-
-        <!-- 流动性管理 -->
-        <div class="card">
-          <div class="admin-section-title">🏦 流动性管理</div>
-          <div class="admin-form">
-            <div class="admin-form-row">
-              <div class="form-group">
-                <label class="form-label">交易对 ID</label>
-                <input class="input" id="liq-pair-id" type="number" placeholder="0" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Token 地址</label>
-                <input class="input" id="liq-token" placeholder="0x..." />
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">数量 (完整单位, 如 1000)</label>
-              <input class="input" id="liq-amount" type="number" placeholder="1000" />
+              <label class="form-label">提取数量 (完整单位，如 1000)</label>
+              <input class="input" id="withdraw-amount" type="number" placeholder="1000" />
             </div>
             <div class="admin-form-row">
-              <button class="btn btn-accent" id="btn-add-liq">添加流动性</button>
-              <button class="btn btn-outline" id="btn-remove-liq">移除流动性</button>
+              <button class="btn btn-accent" id="btn-withdraw-token">提取代币</button>
+              <button class="btn btn-outline" id="btn-withdraw-eth">提取 BNB</button>
             </div>
             <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
-              注意: 添加流动性前需先 approve Token 给 Swap 合约
+              提取代币需要填写代币地址和数量，提取 BNB 将提取合约中全部 BNB
             </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 交易对列表 -->
-      <div class="card" style="margin-top: 1.5rem;">
-        <div class="admin-section-title">📊 交易对列表</div>
-        <div id="pair-list">
-          <div class="loading-placeholder">
-            <div class="loading-spinner-lg"></div>
-            <span>加载中...</span>
           </div>
         </div>
       </div>
@@ -137,110 +109,85 @@ export async function renderSwapManage(container) {
 
   loadSwapInfo();
 
-  // 手续费率
-  document.getElementById('btn-set-fee-rate').addEventListener('click', async () => {
+  // 更新价格
+  document.getElementById('btn-set-price').addEventListener('click', async () => {
     if (!isConnected()) return showToast('请先连接钱包', 'error');
-    const btn = document.getElementById('btn-set-fee-rate');
+    const btn = document.getElementById('btn-set-price');
     try {
       setButtonLoading(btn, true);
-      const rate = document.getElementById('new-fee-rate').value.trim();
-      if (!rate) return showToast('请填写费率', 'error');
+      const priceStr = document.getElementById('new-price').value.trim();
+      if (!priceStr) return showToast('请填写价格', 'error');
+      const priceWei = parseUnits(priceStr, 18);
+      if (priceWei === 0n) return showToast('价格不能为 0', 'error');
       const signer = getSigner();
       const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-      const tx = await contract.setFeeRate(parseInt(rate));
-      await waitForTx(tx, '✅ 手续费率已更新');
+      const tx = await contract.setPrice(priceWei);
+      await waitForTx(tx, '✅ 价格已更新');
       loadSwapInfo();
     } catch (err) { handleError(err); }
-    finally { setButtonLoading(btn, false, '更新'); }
+    finally { setButtonLoading(btn, false, '更新价格'); }
   });
 
-  // 手续费接收地址
-  document.getElementById('btn-set-fee-recipient').addEventListener('click', async () => {
+  // 暂停销售
+  document.getElementById('btn-pause').addEventListener('click', async () => {
     if (!isConnected()) return showToast('请先连接钱包', 'error');
-    const btn = document.getElementById('btn-set-fee-recipient');
+    const btn = document.getElementById('btn-pause');
     try {
       setButtonLoading(btn, true);
-      const addr = document.getElementById('new-fee-recipient').value.trim();
-      if (!addr) return showToast('请填写地址', 'error');
       const signer = getSigner();
       const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-      const tx = await contract.setFeeRecipient(addr);
-      await waitForTx(tx, '✅ 手续费接收地址已更新');
+      const tx = await contract.setPaused(true);
+      await waitForTx(tx, '✅ 销售已暂停');
       loadSwapInfo();
     } catch (err) { handleError(err); }
-    finally { setButtonLoading(btn, false, '更新'); }
+    finally { setButtonLoading(btn, false, '暂停销售'); }
   });
 
-  // 添加交易对
-  document.getElementById('btn-add-pair').addEventListener('click', async () => {
+  // 恢复销售
+  document.getElementById('btn-resume').addEventListener('click', async () => {
     if (!isConnected()) return showToast('请先连接钱包', 'error');
-    const btn = document.getElementById('btn-add-pair');
+    const btn = document.getElementById('btn-resume');
     try {
       setButtonLoading(btn, true);
-      const tokenA = document.getElementById('pair-token-a').value.trim();
-      const tokenB = document.getElementById('pair-token-b').value.trim();
-      const qtyA = document.getElementById('pair-qty-a').value.trim() || '1';
-      const qtyB = document.getElementById('pair-qty-b').value.trim();
-      if (!tokenA || !tokenB || !qtyB) return showToast('请完整填写', 'error');
-      const a = parseFloat(qtyA);
-      const b = parseFloat(qtyB);
-      if (a <= 0 || b <= 0) return showToast('数量必须大于 0', 'error');
-      const rateA2B = (b / a).toFixed(18);
-      const rateB2A = (a / b).toFixed(18);
       const signer = getSigner();
       const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-      const tx = await contract.addPair(tokenA, tokenB, parseUnits(rateA2B, 18), parseUnits(rateB2A, 18));
-      await waitForTx(tx, '✅ 交易对已添加');
+      const tx = await contract.setPaused(false);
+      await waitForTx(tx, '✅ 销售已恢复');
       loadSwapInfo();
     } catch (err) { handleError(err); }
-    finally { setButtonLoading(btn, false, '添加交易对'); }
+    finally { setButtonLoading(btn, false, '恢复销售'); }
   });
 
-  // 添加流动性
-  document.getElementById('btn-add-liq').addEventListener('click', async () => {
+  // 提取代币
+  document.getElementById('btn-withdraw-token').addEventListener('click', async () => {
     if (!isConnected()) return showToast('请先连接钱包', 'error');
-    const btn = document.getElementById('btn-add-liq');
+    const btn = document.getElementById('btn-withdraw-token');
     try {
       setButtonLoading(btn, true);
-      const pairId = document.getElementById('liq-pair-id').value.trim();
-      const token = document.getElementById('liq-token').value.trim();
-      const amount = document.getElementById('liq-amount').value.trim();
-      if (!pairId || !token || !amount) return showToast('请完整填写', 'error');
+      const token = document.getElementById('withdraw-token').value.trim();
+      const amount = document.getElementById('withdraw-amount').value.trim();
+      if (!token || !amount) return showToast('请完整填写', 'error');
       const signer = getSigner();
-      const amountWei = parseUnits(amount, 18);
-
-      // 自动 approve
-      const tokenContract = new Contract(token, GUGUToken_ABI, signer);
-      const currentAllowance = await tokenContract.allowance(await signer.getAddress(), TokenSwap_ADDRESS);
-      if (currentAllowance < amountWei) {
-        showToast('正在授权 Token...', 'info');
-        const approveTx = await tokenContract.approve(TokenSwap_ADDRESS, amountWei);
-        await waitForTx(approveTx, '✅ Token 授权成功');
-      }
-
       const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-      const tx = await contract.addLiquidity(parseInt(pairId), token, amountWei);
-      await waitForTx(tx, '✅ 流动性已添加');
+      const tx = await contract.withdrawToken(token, parseUnits(amount, 18));
+      await waitForTx(tx, '✅ 代币已提取');
+      loadSwapInfo();
     } catch (err) { handleError(err); }
-    finally { setButtonLoading(btn, false, '添加流动性'); }
+    finally { setButtonLoading(btn, false, '提取代币'); }
   });
 
-  // 移除流动性
-  document.getElementById('btn-remove-liq').addEventListener('click', async () => {
+  // 提取 BNB
+  document.getElementById('btn-withdraw-eth').addEventListener('click', async () => {
     if (!isConnected()) return showToast('请先连接钱包', 'error');
-    const btn = document.getElementById('btn-remove-liq');
+    const btn = document.getElementById('btn-withdraw-eth');
     try {
       setButtonLoading(btn, true);
-      const pairId = document.getElementById('liq-pair-id').value.trim();
-      const token = document.getElementById('liq-token').value.trim();
-      const amount = document.getElementById('liq-amount').value.trim();
-      if (!pairId || !token || !amount) return showToast('请完整填写', 'error');
       const signer = getSigner();
       const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-      const tx = await contract.removeLiquidity(parseInt(pairId), token, parseUnits(amount, 18));
-      await waitForTx(tx, '✅ 流动性已移除');
+      const tx = await contract.withdrawETH();
+      await waitForTx(tx, '✅ BNB 已提取');
     } catch (err) { handleError(err); }
-    finally { setButtonLoading(btn, false, '移除流动性'); }
+    finally { setButtonLoading(btn, false, '提取 BNB'); }
   });
 
   return () => {};
@@ -252,126 +199,49 @@ async function loadSwapInfo() {
     if (!provider) return;
     const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, provider);
 
-    const [owner, feeRate, feeRecipient, pairCount] = await Promise.all([
+    const ERC20_META = [
+      'function symbol() view returns (string)',
+      'function decimals() view returns (uint8)',
+    ];
+
+    const [owner, saleTkn, payTkn, price, paused, remaining] = await Promise.all([
       contract.owner().catch(() => '—'),
-      contract.feeRate().catch(() => 0n),
-      contract.feeRecipient().catch(() => '—'),
-      contract.pairCount().catch(() => 0n),
+      contract.saleToken().catch(() => null),
+      contract.payToken().catch(() => null),
+      contract.price().catch(() => 0n),
+      contract.paused().catch(() => false),
+      contract.remainingSupply().catch(() => 0n),
     ]);
 
     setVal('swap-owner', owner);
-    setVal('swap-fee-rate', `${Number(feeRate)} (${Number(feeRate) / 100}%)`);
-    setVal('swap-fee-recipient', feeRecipient);
-    setVal('swap-pair-count', Number(pairCount).toString());
+    setVal('swap-paused', paused ? '⏸ 已暂停' : '🟢 销售中');
 
-    // 加载交易对列表
-    const listEl = document.getElementById('pair-list');
-    const count = Number(pairCount);
-    if (count === 0) {
-      listEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-text">暂无交易对</div></div>`;
-      return;
-    }
-
-    // 读取 token symbol
-    const ERC20_SYM = ['function symbol() view returns (string)'];
-    async function getSymbol(addr) {
+    if (saleTkn) {
       try {
-        const c = new Contract(addr, ERC20_SYM, provider);
-        return await c.symbol();
-      } catch { return addr.slice(0, 6) + '…' + addr.slice(-4); }
+        const sc = new Contract(saleTkn, ERC20_META, provider);
+        saleSymbol = await sc.symbol();
+        saleDecimals = Number(await sc.decimals());
+      } catch { saleSymbol = 'GUGU'; }
+      setVal('swap-sale-token', `${saleSymbol} (${saleTkn.slice(0, 8)}...${saleTkn.slice(-4)})`);
     }
 
-    let html = '';
-    for (let i = 0; i < count; i++) {
+    if (payTkn) {
       try {
-        const pair = await contract.getPair(i);
-        const symA = await getSymbol(pair.tokenA);
-        const symB = await getSymbol(pair.tokenB);
-        const rateA2B = formatUnits(pair.rateAtoB, 18);
-        const rateB2A = formatUnits(pair.rateBtoA, 18);
-        html += `
-          <div class="card pair-card">
-            <div class="pair-card-header">
-              <span class="pair-id-badge">Pair #${i}</span>
-              <span class="pair-status ${pair.active ? 'active' : 'inactive'}">
-                ${pair.active ? '● 活跃' : '○ 暂停'}
-              </span>
-            </div>
-            <div class="admin-info-row">
-              <span class="admin-info-label">Token A (${symA})</span>
-              <span class="admin-info-value mono">${pair.tokenA.slice(0, 8)}...${pair.tokenA.slice(-4)}</span>
-            </div>
-            <div class="admin-info-row">
-              <span class="admin-info-label">Token B (${symB})</span>
-              <span class="admin-info-value mono">${pair.tokenB.slice(0, 8)}...${pair.tokenB.slice(-4)}</span>
-            </div>
-            <div class="admin-info-row">
-              <span class="admin-info-label">${symA}→${symB} 汇率</span>
-              <span class="admin-info-value">1 ${symA} = ${parseFloat(rateA2B)} ${symB}</span>
-            </div>
-            <div class="admin-info-row">
-              <span class="admin-info-label">${symB}→${symA} 汇率</span>
-              <span class="admin-info-value">1 ${symB} = ${parseFloat(rateB2A)} ${symA}</span>
-            </div>
-            <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
-              <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">修改汇率</div>
-              <div class="form-group">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <input class="input" id="rate-qty-a-${i}" type="number" placeholder="${parseFloat(rateB2A) === 1 ? '1' : '1'}" value="1" style="flex: 1; text-align: center;" />
-                  <span style="font-size: 0.8rem; color: var(--text-secondary);">${symA}</span>
-                  <span style="font-size: 1.2rem; font-weight: 700; color: var(--primary-light);">＝</span>
-                  <input class="input" id="rate-qty-b-${i}" type="number" placeholder="${parseFloat(rateA2B)}" style="flex: 1; text-align: center;" />
-                  <span style="font-size: 0.8rem; color: var(--text-secondary);">${symB}</span>
-                </div>
-              </div>
-              <div class="pair-actions">
-                <button class="btn btn-sm btn-primary" onclick="window.__updateRates(${i})">更新汇率</button>
-                <button class="btn btn-sm btn-outline" onclick="window.__togglePair(${i}, ${!pair.active})">
-                  ${pair.active ? '停用' : '启用'}
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-      } catch {}
+        const pc = new Contract(payTkn, ERC20_META, provider);
+        paySymbol = await pc.symbol();
+        payDecimals = Number(await pc.decimals());
+      } catch { paySymbol = 'USDT'; }
+      setVal('swap-pay-token', `${paySymbol} (${payTkn.slice(0, 8)}...${payTkn.slice(-4)})`);
     }
-    listEl.innerHTML = html;
+
+    const priceFormatted = formatUnits(price, 18);
+    setVal('swap-price', `1 ${saleSymbol} = ${parseFloat(priceFormatted)} ${paySymbol}`);
+    setVal('swap-remaining', `${fmtToken(remaining, saleDecimals)} ${saleSymbol}`);
+
   } catch (err) {
     console.error('loadSwapInfo error:', err);
   }
 }
-
-// 暂停/恢复交易对
-window.__togglePair = async (pairId, active) => {
-  if (!isConnected()) return showToast('请先连接钱包', 'error');
-  try {
-    const signer = getSigner();
-    const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-    const tx = await contract.setPairActive(pairId, active);
-    await waitForTx(tx, `✅ 交易对 #${pairId} 已${active ? '启用' : '停用'}`);
-    loadSwapInfo();
-  } catch (err) { handleError(err); }
-};
-
-// 更新汇率
-window.__updateRates = async (pairId) => {
-  if (!isConnected()) return showToast('请先连接钱包', 'error');
-  try {
-    const qtyA = document.getElementById(`rate-qty-a-${pairId}`).value.trim() || '1';
-    const qtyB = document.getElementById(`rate-qty-b-${pairId}`).value.trim();
-    if (!qtyB) return showToast('请填写汇率', 'error');
-    const a = parseFloat(qtyA);
-    const b = parseFloat(qtyB);
-    if (a <= 0 || b <= 0) return showToast('数量必须大于 0', 'error');
-    const rateA2B = (b / a).toFixed(18);
-    const rateB2A = (a / b).toFixed(18);
-    const signer = getSigner();
-    const contract = new Contract(TokenSwap_ADDRESS, TokenSwap_ABI, signer);
-    const tx = await contract.updatePairRates(pairId, parseUnits(rateA2B, 18), parseUnits(rateB2A, 18));
-    await waitForTx(tx, `✅ 交易对 #${pairId} 汇率已更新`);
-    loadSwapInfo();
-  } catch (err) { handleError(err); }
-};
 
 function setVal(id, val) {
   const el = document.getElementById(id);
