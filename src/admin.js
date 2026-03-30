@@ -12,6 +12,7 @@ import { NETWORK_NAME, CHAIN_NAME } from './config/contracts.js';
 import { renderTokenManage } from './admin/token-manage.js';
 import { renderNftManage } from './admin/nft-manage.js';
 import { renderStakingManage } from './admin/staking-manage.js';
+import { renderTokenStakingManage } from './admin/token-staking-manage.js';
 import { renderBoxManage } from './admin/box-manage.js';
 import { renderSwapManage } from './admin/swap-manage.js';
 import { renderAirdropManage } from './admin/airdrop-manage.js';
@@ -21,6 +22,7 @@ const routes = {
   '/token': renderTokenManage,
   '/nft': renderNftManage,
   '/staking': renderStakingManage,
+  '/token-staking': renderTokenStakingManage,
   '/box': renderBoxManage,
   '/swap': renderSwapManage,
   '/airdrop': renderAirdropManage,
@@ -49,7 +51,11 @@ function init() {
           </a></li>
           <li><a href="#/staking" class="nav-link" id="nav-staking">
             <span class="nav-link-icon">🔒</span>
-            <span class="nav-link-text">质押</span>
+            <span class="nav-link-text">NFT质押</span>
+          </a></li>
+          <li><a href="#/token-staking" class="nav-link" id="nav-token-staking">
+            <span class="nav-link-icon">🏦</span>
+            <span class="nav-link-text">Token质押</span>
           </a></li>
           <li><a href="#/box" class="nav-link" id="nav-box">
             <span class="nav-link-icon">🎁</span>

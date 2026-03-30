@@ -8,6 +8,7 @@ import { registerRoute, initRouter, refreshCurrentPage } from './router.js';
 import { NETWORK_NAME, CHAIN_NAME } from './config/contracts.js';
 import { renderMintPage } from './pages/mint.js';
 import { renderStakingPage } from './pages/staking.js';
+import { renderTokenStakingPage } from './pages/token-staking.js';
 import { renderMysteryBoxPage } from './pages/mysterybox.js';
 import { renderDashboardPage } from './pages/dashboard.js';
 import { renderSwapPage } from './pages/swap.js';
@@ -28,7 +29,11 @@ function init() {
           </a></li>
           <li><a href="#/staking" class="nav-link" id="nav-staking">
             <span class="nav-link-icon">🔒</span>
-            <span class="nav-link-text">质押</span>
+            <span class="nav-link-text">NFT 质押</span>
+          </a></li>
+          <li><a href="#/token-staking" class="nav-link" id="nav-token-staking">
+            <span class="nav-link-icon">🏦</span>
+            <span class="nav-link-text">Token 质押</span>
           </a></li>
           <li><a href="#/mysterybox" class="nav-link" id="nav-mysterybox">
             <span class="nav-link-icon">🎁</span>
@@ -103,6 +108,7 @@ function init() {
   // ── 注册路由 ──
   registerRoute('/mint', renderMintPage);
   registerRoute('/staking', renderStakingPage);
+  registerRoute('/token-staking', renderTokenStakingPage);
   registerRoute('/mysterybox', renderMysteryBoxPage);
   registerRoute('/swap', renderSwapPage);
   registerRoute('/dashboard', renderDashboardPage);

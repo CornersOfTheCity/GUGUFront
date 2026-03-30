@@ -8,6 +8,7 @@ import {
   GUGUToken_ADDRESS, GUGUToken_ABI,
   GUGUNFT_ADDRESS, GUGUNFT_ABI,
   NFTStaking_ADDRESS, NFTStaking_ABI,
+  TokenStaking_ADDRESS, TokenStaking_ABI,
   RARITY_NAMES, RARITY_EMOJIS,
   TOKENOMICS,
 } from '../config/contracts.js';
@@ -38,7 +39,15 @@ export async function renderDashboardPage(container) {
         </div>
         <div class="card stat-card">
           <div class="stat-value" id="dash-pending-rewards">—</div>
-          <div class="stat-label">待领取奖励 (GUGU)</div>
+          <div class="stat-label">NFT 待领奖励 (GUGU)</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-value" id="dash-token-staked">—</div>
+          <div class="stat-label">Token 质押 (GUGU)</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-value" id="dash-token-pending">—</div>
+          <div class="stat-label">Token 待领奖励 (GUGU)</div>
         </div>
       </div>
 
@@ -68,7 +77,11 @@ export async function renderDashboardPage(container) {
             </a>
             <a href="#/staking" class="quick-action-btn">
               <span class="quick-action-icon">🔒</span>
-              <span class="quick-action-label">质押管理</span>
+              <span class="quick-action-label">NFT 质押</span>
+            </a>
+            <a href="#/token-staking" class="quick-action-btn">
+              <span class="quick-action-icon">🏦</span>
+              <span class="quick-action-label">Token 质押</span>
             </a>
             <a href="#/mysterybox" class="quick-action-btn">
               <span class="quick-action-icon">🎁</span>
@@ -189,11 +202,14 @@ async function loadDashboard() {
     const stakingContract = new Contract(NFTStaking_ADDRESS, NFTStaking_ABI, provider);
 
     // 并行请求
-    const [guguBalance, nftBalance, stakedCount, pendingRewards] = await Promise.all([
+    const tokenStakingContract = new Contract(TokenStaking_ADDRESS, TokenStaking_ABI, provider);
+
+    const [guguBalance, nftBalance, stakedCount, pendingRewards, tokenStakeInfo] = await Promise.all([
       tokenContract.balanceOf(address).catch(() => 0n),
       nftContract.balanceOf(address).catch(() => 0n),
       stakingContract.stakedCountOf(address).catch(() => 0n),
       stakingContract.pendingRewards(address).catch(() => 0n),
+      tokenStakingContract.getUserInfo(address).catch(() => [0n, 0n, 0n, 0n]),
     ]);
 
     // 更新统计
@@ -201,6 +217,8 @@ async function loadDashboard() {
     setDashValue('dash-nft-count', Number(nftBalance).toString());
     setDashValue('dash-staked-count', Number(stakedCount).toString());
     setDashValue('dash-pending-rewards', fmtToken(pendingRewards));
+    setDashValue('dash-token-staked', fmtToken(tokenStakeInfo[0]));
+    setDashValue('dash-token-pending', fmtToken(tokenStakeInfo[1]));
 
     // NFT 列表
     await loadDashNfts(nftContract, address, Number(nftBalance));

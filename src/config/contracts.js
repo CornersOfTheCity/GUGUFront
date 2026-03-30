@@ -15,8 +15,9 @@ const NETWORKS = {
     GUGUNFT_ADDRESS:    '0x485726cdbc7D388896aaED7aCF9D02f3d7339dff',
     NFTStaking_ADDRESS: '0x4Fe07dBA8dc600BAD8843FfB0C7C316895145b8D',
     MysteryBox_ADDRESS: '0xd5A512152B1736a2808dDdB7139E05E445de044B',
-    TokenSwap_ADDRESS:  '0x923d923d5b4201d1F6cb38Acc7159C7dAdB76A52',
-    Airdrop_ADDRESS:    '0x513DFF2bdccabcc9B65241F1211DC243c11f1684',
+    TokenSwap_ADDRESS:     '0xe1b347974D8d5A5e67F33eb24C1E93B9150C71ec',
+    Airdrop_ADDRESS:       '0x513DFF2bdccabcc9B65241F1211DC243c11f1684',
+    TokenStaking_ADDRESS:  '0xFd6720C6DC2d1C8E3D0961eF321266d052c43A42',
   },
   testnet: {
     CHAIN_ID: 97,
@@ -28,8 +29,9 @@ const NETWORKS = {
     GUGUNFT_ADDRESS:    '0x764f16e89FE34E3DE8Fab2b0f21003a5Ee31210B',
     NFTStaking_ADDRESS: '0xCee4A2B098d9BfEAe91Bd942Af21Ca257683fE7C',
     MysteryBox_ADDRESS: '0xf07255d83bAdE34eCf1e64775c30B7D751d5D914',
-    TokenSwap_ADDRESS:  '0x5cD6520090d623695aE44391DB9110F12Af0449E',
-    Airdrop_ADDRESS:    '0xff0b91F7eEE1d6E0771d84369791eCB8876E4567',
+    TokenSwap_ADDRESS:     '0x24634f8f58b52d3594dcEA1E59E63Fbf8F70a997',
+    Airdrop_ADDRESS:       '0xff0b91F7eEE1d6E0771d84369791eCB8876E4567',
+    TokenStaking_ADDRESS:  '0x0Bdf53d24dDf70C57DD00DEF3e46e06AE5E5Fb5A',
   },
 };
 
@@ -48,8 +50,9 @@ export const GUGUToken_ADDRESS  = config.GUGUToken_ADDRESS;
 export const GUGUNFT_ADDRESS    = config.GUGUNFT_ADDRESS;
 export const NFTStaking_ADDRESS = config.NFTStaking_ADDRESS;
 export const MysteryBox_ADDRESS = config.MysteryBox_ADDRESS;
-export const TokenSwap_ADDRESS  = config.TokenSwap_ADDRESS;
-export const Airdrop_ADDRESS    = config.Airdrop_ADDRESS;
+export const TokenSwap_ADDRESS     = config.TokenSwap_ADDRESS;
+export const Airdrop_ADDRESS       = config.Airdrop_ADDRESS;
+export const TokenStaking_ADDRESS  = config.TokenStaking_ADDRESS;
 
 // ── ABI 片段 ──
 
@@ -139,22 +142,35 @@ export const MysteryBox_ABI = [
 
 export const TokenSwap_ABI = [
   // ── User Functions ──
-  'function buy(uint256 payAmount) external',
-  'function getAmountOut(uint256 payAmount) external view returns (uint256)',
+  'function buy(address payToken, uint256 payAmount) external',
+  'function sell(address receiveToken, uint256 guguAmount) external',
+  'function getBuyAmountOut(address payToken, uint256 payAmount) external view returns (uint256)',
+  'function getSellAmountOut(address receiveToken, uint256 guguAmount) external view returns (uint256)',
   'function remainingSupply() external view returns (uint256)',
   'function saleToken() external view returns (address)',
-  'function payToken() external view returns (address)',
-  'function price() external view returns (uint256)',
   'function paused() external view returns (bool)',
+  'function buybackEnabled() external view returns (bool)',
+  // ── Pay Token Queries ──
+  'function getPayTokenList() external view returns (address[])',
+  'function getPayTokenInfo(address token) external view returns (uint256 buyPrice, uint256 sellPrice, bool enabled)',
+  'function payTokenCount() external view returns (uint256)',
   // ── Admin ──
   'function owner() external view returns (address)',
-  'function setPrice(uint256 _price) external',
+  'function addPayToken(address token, uint256 buyPrice, uint256 sellPrice) external',
+  'function removePayToken(address token) external',
+  'function setTokenPrices(address token, uint256 buyPrice, uint256 sellPrice) external',
+  'function setTokenEnabled(address token, bool enabled) external',
+  'function setBuybackEnabled(bool enabled) external',
   'function setPaused(bool _paused) external',
   'function withdrawToken(address token, uint256 amount) external',
   'function withdrawETH() external',
   // ── Events ──
-  'event TokensPurchased(address indexed buyer, uint256 payAmount, uint256 saleAmount)',
-  'event PriceUpdated(uint256 oldPrice, uint256 newPrice)',
+  'event TokensPurchased(address indexed buyer, address indexed payToken, uint256 payAmount, uint256 saleAmount)',
+  'event TokensSold(address indexed seller, address indexed receiveToken, uint256 guguAmount, uint256 receiveAmount)',
+  'event PayTokenAdded(address indexed token, uint256 buyPrice, uint256 sellPrice)',
+  'event PayTokenRemoved(address indexed token)',
+  'event TokenPricesUpdated(address indexed token, uint256 buyPrice, uint256 sellPrice)',
+  'event BuybackToggled(bool enabled)',
   'event SalePaused(bool paused)',
 ];
 
@@ -170,6 +186,41 @@ export const Airdrop_ABI = [
   'function rescueToken(address token) external',
   'event TokenAirdropped(address indexed token, uint256 totalRecipients, uint256 totalAmount)',
   'event NFTAirdropped(uint256 totalRecipients, uint8 rarity)',
+];
+
+export const TokenStaking_ABI = [
+  // ── User Functions ──
+  'function stake(uint256 amount) external',
+  'function unstake(uint256 amount) external',
+  'function claimRewards() external',
+  'function compound() external',
+  'function emergencyWithdraw() external',
+  // ── Queries ──
+  'function pendingRewards(address user) external view returns (uint256)',
+  'function rewardPoolBalance() external view returns (uint256)',
+  'function getUserInfo(address user) external view returns (uint256 stakedAmount, uint256 pending, uint256 stakedAt, uint256 unlockTime)',
+  'function guguToken() external view returns (address)',
+  'function aprBps() external view returns (uint256)',
+  'function MAX_APR_BPS() external view returns (uint256)',
+  'function minLockDuration() external view returns (uint256)',
+  'function paused() external view returns (bool)',
+  'function totalStaked() external view returns (uint256)',
+  // ── Admin ──
+  'function owner() external view returns (address)',
+  'function setApr(uint256 newAprBps) external',
+  'function setMinLockDuration(uint256 newDuration) external',
+  'function pause() external',
+  'function unpause() external',
+  'function fundRewardPool(uint256 amount) external',
+  'function drainRewardPool(address to, uint256 amount) external',
+  // ── Events ──
+  'event Staked(address indexed user, uint256 amount)',
+  'event Unstaked(address indexed user, uint256 amount, uint256 reward)',
+  'event RewardsClaimed(address indexed user, uint256 reward)',
+  'event RewardsCompounded(address indexed user, uint256 reward)',
+  'event AprUpdated(uint256 oldApr, uint256 newApr)',
+  'event MinLockDurationUpdated(uint256 oldDuration, uint256 newDuration)',
+  'event EmergencyWithdraw(address indexed user, uint256 amount)',
 ];
 
 

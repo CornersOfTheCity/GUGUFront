@@ -203,7 +203,8 @@ export async function tryAutoConnect() {
     if (accounts && accounts.length > 0) {
       provider = new BrowserProvider(window.ethereum);
       currentAddress = accounts[0];
-      // signer 延迟到主动连接或交易时获取，避免弹窗
+      // 同时获取 signer，否则 getSigner() 返回 null 导致写操作报错
+      try { signer = await provider.getSigner(); } catch {}
       initEvents();
       notifyListeners();
     } else {
